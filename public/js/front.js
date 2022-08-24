@@ -424,40 +424,47 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return getBoundingClientRect; });
 /* harmony import */ var _instanceOf_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./instanceOf.js */ "./node_modules/@popperjs/core/lib/dom-utils/instanceOf.js");
 /* harmony import */ var _utils_math_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/math.js */ "./node_modules/@popperjs/core/lib/utils/math.js");
+/* harmony import */ var _getWindow_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./getWindow.js */ "./node_modules/@popperjs/core/lib/dom-utils/getWindow.js");
+/* harmony import */ var _isLayoutViewport_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./isLayoutViewport.js */ "./node_modules/@popperjs/core/lib/dom-utils/isLayoutViewport.js");
 
 
-function getBoundingClientRect(element, includeScale) {
+
+
+function getBoundingClientRect(element, includeScale, isFixedStrategy) {
   if (includeScale === void 0) {
     includeScale = false;
   }
 
-  var rect = element.getBoundingClientRect();
+  if (isFixedStrategy === void 0) {
+    isFixedStrategy = false;
+  }
+
+  var clientRect = element.getBoundingClientRect();
   var scaleX = 1;
   var scaleY = 1;
 
-  if (Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_0__["isHTMLElement"])(element) && includeScale) {
-    var offsetHeight = element.offsetHeight;
-    var offsetWidth = element.offsetWidth; // Do not attempt to divide by 0, otherwise we get `Infinity` as scale
-    // Fallback to 1 in case both values are `0`
-
-    if (offsetWidth > 0) {
-      scaleX = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_1__["round"])(rect.width) / offsetWidth || 1;
-    }
-
-    if (offsetHeight > 0) {
-      scaleY = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_1__["round"])(rect.height) / offsetHeight || 1;
-    }
+  if (includeScale && Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_0__["isHTMLElement"])(element)) {
+    scaleX = element.offsetWidth > 0 ? Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_1__["round"])(clientRect.width) / element.offsetWidth || 1 : 1;
+    scaleY = element.offsetHeight > 0 ? Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_1__["round"])(clientRect.height) / element.offsetHeight || 1 : 1;
   }
 
+  var _ref = Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_0__["isElement"])(element) ? Object(_getWindow_js__WEBPACK_IMPORTED_MODULE_2__["default"])(element) : window,
+      visualViewport = _ref.visualViewport;
+
+  var addVisualOffsets = !Object(_isLayoutViewport_js__WEBPACK_IMPORTED_MODULE_3__["default"])() && isFixedStrategy;
+  var x = (clientRect.left + (addVisualOffsets && visualViewport ? visualViewport.offsetLeft : 0)) / scaleX;
+  var y = (clientRect.top + (addVisualOffsets && visualViewport ? visualViewport.offsetTop : 0)) / scaleY;
+  var width = clientRect.width / scaleX;
+  var height = clientRect.height / scaleY;
   return {
-    width: rect.width / scaleX,
-    height: rect.height / scaleY,
-    top: rect.top / scaleY,
-    right: rect.right / scaleX,
-    bottom: rect.bottom / scaleY,
-    left: rect.left / scaleX,
-    x: rect.left / scaleX,
-    y: rect.top / scaleY
+    width: width,
+    height: height,
+    top: y,
+    right: x + width,
+    bottom: y + height,
+    left: x,
+    x: x,
+    y: y
   };
 }
 
@@ -502,8 +509,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function getInnerBoundingClientRect(element) {
-  var rect = Object(_getBoundingClientRect_js__WEBPACK_IMPORTED_MODULE_8__["default"])(element);
+function getInnerBoundingClientRect(element, strategy) {
+  var rect = Object(_getBoundingClientRect_js__WEBPACK_IMPORTED_MODULE_8__["default"])(element, false, strategy === 'fixed');
   rect.top = rect.top + element.clientTop;
   rect.left = rect.left + element.clientLeft;
   rect.bottom = rect.top + element.clientHeight;
@@ -515,8 +522,8 @@ function getInnerBoundingClientRect(element) {
   return rect;
 }
 
-function getClientRectFromMixedType(element, clippingParent) {
-  return clippingParent === _enums_js__WEBPACK_IMPORTED_MODULE_0__["viewport"] ? Object(_utils_rectToClientRect_js__WEBPACK_IMPORTED_MODULE_12__["default"])(Object(_getViewportRect_js__WEBPACK_IMPORTED_MODULE_1__["default"])(element)) : Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_7__["isElement"])(clippingParent) ? getInnerBoundingClientRect(clippingParent) : Object(_utils_rectToClientRect_js__WEBPACK_IMPORTED_MODULE_12__["default"])(Object(_getDocumentRect_js__WEBPACK_IMPORTED_MODULE_2__["default"])(Object(_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_5__["default"])(element)));
+function getClientRectFromMixedType(element, clippingParent, strategy) {
+  return clippingParent === _enums_js__WEBPACK_IMPORTED_MODULE_0__["viewport"] ? Object(_utils_rectToClientRect_js__WEBPACK_IMPORTED_MODULE_12__["default"])(Object(_getViewportRect_js__WEBPACK_IMPORTED_MODULE_1__["default"])(element, strategy)) : Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_7__["isElement"])(clippingParent) ? getInnerBoundingClientRect(clippingParent, strategy) : Object(_utils_rectToClientRect_js__WEBPACK_IMPORTED_MODULE_12__["default"])(Object(_getDocumentRect_js__WEBPACK_IMPORTED_MODULE_2__["default"])(Object(_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_5__["default"])(element)));
 } // A "clipping parent" is an overflowable container with the characteristic of
 // clipping (or hiding) overflowing elements with a position different from
 // `initial`
@@ -539,18 +546,18 @@ function getClippingParents(element) {
 // clipping parents
 
 
-function getClippingRect(element, boundary, rootBoundary) {
+function getClippingRect(element, boundary, rootBoundary, strategy) {
   var mainClippingParents = boundary === 'clippingParents' ? getClippingParents(element) : [].concat(boundary);
   var clippingParents = [].concat(mainClippingParents, [rootBoundary]);
   var firstClippingParent = clippingParents[0];
   var clippingRect = clippingParents.reduce(function (accRect, clippingParent) {
-    var rect = getClientRectFromMixedType(element, clippingParent);
+    var rect = getClientRectFromMixedType(element, clippingParent, strategy);
     accRect.top = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_13__["max"])(rect.top, accRect.top);
     accRect.right = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_13__["min"])(rect.right, accRect.right);
     accRect.bottom = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_13__["min"])(rect.bottom, accRect.bottom);
     accRect.left = Object(_utils_math_js__WEBPACK_IMPORTED_MODULE_13__["max"])(rect.left, accRect.left);
     return accRect;
-  }, getClientRectFromMixedType(element, firstClippingParent));
+  }, getClientRectFromMixedType(element, firstClippingParent, strategy));
   clippingRect.width = clippingRect.right - clippingRect.left;
   clippingRect.height = clippingRect.bottom - clippingRect.top;
   clippingRect.x = clippingRect.left;
@@ -604,7 +611,7 @@ function getCompositeRect(elementOrVirtualElement, offsetParent, isFixed) {
   var isOffsetParentAnElement = Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_3__["isHTMLElement"])(offsetParent);
   var offsetParentIsScaled = Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_3__["isHTMLElement"])(offsetParent) && isElementScaled(offsetParent);
   var documentElement = Object(_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_5__["default"])(offsetParent);
-  var rect = Object(_getBoundingClientRect_js__WEBPACK_IMPORTED_MODULE_0__["default"])(elementOrVirtualElement, offsetParentIsScaled);
+  var rect = Object(_getBoundingClientRect_js__WEBPACK_IMPORTED_MODULE_0__["default"])(elementOrVirtualElement, offsetParentIsScaled, isFixed);
   var scroll = {
     scrollLeft: 0,
     scrollTop: 0
@@ -842,6 +849,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _instanceOf_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./instanceOf.js */ "./node_modules/@popperjs/core/lib/dom-utils/instanceOf.js");
 /* harmony import */ var _isTableElement_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./isTableElement.js */ "./node_modules/@popperjs/core/lib/dom-utils/isTableElement.js");
 /* harmony import */ var _getParentNode_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./getParentNode.js */ "./node_modules/@popperjs/core/lib/dom-utils/getParentNode.js");
+/* harmony import */ var _utils_userAgent_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../utils/userAgent.js */ "./node_modules/@popperjs/core/lib/utils/userAgent.js");
+
 
 
 
@@ -861,8 +870,8 @@ function getTrueOffsetParent(element) {
 
 
 function getContainingBlock(element) {
-  var isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') !== -1;
-  var isIE = navigator.userAgent.indexOf('Trident') !== -1;
+  var isFirefox = /firefox/i.test(Object(_utils_userAgent_js__WEBPACK_IMPORTED_MODULE_6__["default"])());
+  var isIE = /Trident/i.test(Object(_utils_userAgent_js__WEBPACK_IMPORTED_MODULE_6__["default"])());
 
   if (isIE && Object(_instanceOf_js__WEBPACK_IMPORTED_MODULE_3__["isHTMLElement"])(element)) {
     // In IE 9, 10 and 11 fixed elements containing block is always established by the viewport
@@ -994,34 +1003,26 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _getWindow_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./getWindow.js */ "./node_modules/@popperjs/core/lib/dom-utils/getWindow.js");
 /* harmony import */ var _getDocumentElement_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./getDocumentElement.js */ "./node_modules/@popperjs/core/lib/dom-utils/getDocumentElement.js");
 /* harmony import */ var _getWindowScrollBarX_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./getWindowScrollBarX.js */ "./node_modules/@popperjs/core/lib/dom-utils/getWindowScrollBarX.js");
+/* harmony import */ var _isLayoutViewport_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./isLayoutViewport.js */ "./node_modules/@popperjs/core/lib/dom-utils/isLayoutViewport.js");
 
 
 
-function getViewportRect(element) {
+
+function getViewportRect(element, strategy) {
   var win = Object(_getWindow_js__WEBPACK_IMPORTED_MODULE_0__["default"])(element);
   var html = Object(_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_1__["default"])(element);
   var visualViewport = win.visualViewport;
   var width = html.clientWidth;
   var height = html.clientHeight;
   var x = 0;
-  var y = 0; // NB: This isn't supported on iOS <= 12. If the keyboard is open, the popper
-  // can be obscured underneath it.
-  // Also, `html.clientHeight` adds the bottom bar height in Safari iOS, even
-  // if it isn't open, so if this isn't available, the popper will be detected
-  // to overflow the bottom of the screen too early.
+  var y = 0;
 
   if (visualViewport) {
     width = visualViewport.width;
-    height = visualViewport.height; // Uses Layout Viewport (like Chrome; Safari does not currently)
-    // In Chrome, it returns a value very close to 0 (+/-) but contains rounding
-    // errors due to floating point numbers, so we need to check precision.
-    // Safari returns a number <= 0, usually < -1 when pinch-zoomed
-    // Feature detection fails in mobile emulation mode in Chrome.
-    // Math.abs(win.innerWidth / visualViewport.scale - visualViewport.width) <
-    // 0.001
-    // Fallback here: "Not Safari" userAgent
+    height = visualViewport.height;
+    var layoutViewport = Object(_isLayoutViewport_js__WEBPACK_IMPORTED_MODULE_3__["default"])();
 
-    if (!/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+    if (layoutViewport || !layoutViewport && strategy === 'fixed') {
       x = visualViewport.offsetLeft;
       y = visualViewport.offsetTop;
     }
@@ -1151,6 +1152,24 @@ function isShadowRoot(node) {
 }
 
 
+
+/***/ }),
+
+/***/ "./node_modules/@popperjs/core/lib/dom-utils/isLayoutViewport.js":
+/*!***********************************************************************!*\
+  !*** ./node_modules/@popperjs/core/lib/dom-utils/isLayoutViewport.js ***!
+  \***********************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return isLayoutViewport; });
+/* harmony import */ var _utils_userAgent_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils/userAgent.js */ "./node_modules/@popperjs/core/lib/utils/userAgent.js");
+
+function isLayoutViewport() {
+  return !/^((?!chrome|android).)*safari/i.test(Object(_utils_userAgent_js__WEBPACK_IMPORTED_MODULE_0__["default"])());
+}
 
 /***/ }),
 
@@ -2773,6 +2792,8 @@ function detectOverflow(state, options) {
   var _options = options,
       _options$placement = _options.placement,
       placement = _options$placement === void 0 ? state.placement : _options$placement,
+      _options$strategy = _options.strategy,
+      strategy = _options$strategy === void 0 ? state.strategy : _options$strategy,
       _options$boundary = _options.boundary,
       boundary = _options$boundary === void 0 ? _enums_js__WEBPACK_IMPORTED_MODULE_5__["clippingParents"] : _options$boundary,
       _options$rootBoundary = _options.rootBoundary,
@@ -2787,7 +2808,7 @@ function detectOverflow(state, options) {
   var altContext = elementContext === _enums_js__WEBPACK_IMPORTED_MODULE_5__["popper"] ? _enums_js__WEBPACK_IMPORTED_MODULE_5__["reference"] : _enums_js__WEBPACK_IMPORTED_MODULE_5__["popper"];
   var popperRect = state.rects.popper;
   var element = state.elements[altBoundary ? altContext : elementContext];
-  var clippingClientRect = Object(_dom_utils_getClippingRect_js__WEBPACK_IMPORTED_MODULE_0__["default"])(Object(_dom_utils_instanceOf_js__WEBPACK_IMPORTED_MODULE_6__["isElement"])(element) ? element : element.contextElement || Object(_dom_utils_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_1__["default"])(state.elements.popper), boundary, rootBoundary);
+  var clippingClientRect = Object(_dom_utils_getClippingRect_js__WEBPACK_IMPORTED_MODULE_0__["default"])(Object(_dom_utils_instanceOf_js__WEBPACK_IMPORTED_MODULE_6__["isElement"])(element) ? element : element.contextElement || Object(_dom_utils_getDocumentElement_js__WEBPACK_IMPORTED_MODULE_1__["default"])(state.elements.popper), boundary, rootBoundary, strategy);
   var referenceClientRect = Object(_dom_utils_getBoundingClientRect_js__WEBPACK_IMPORTED_MODULE_2__["default"])(state.elements.reference);
   var popperOffsets = Object(_computeOffsets_js__WEBPACK_IMPORTED_MODULE_3__["default"])({
     reference: referenceClientRect,
@@ -3157,6 +3178,30 @@ function uniqueBy(arr, fn) {
       return true;
     }
   });
+}
+
+/***/ }),
+
+/***/ "./node_modules/@popperjs/core/lib/utils/userAgent.js":
+/*!************************************************************!*\
+  !*** ./node_modules/@popperjs/core/lib/utils/userAgent.js ***!
+  \************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return getUAString; });
+function getUAString() {
+  var uaData = navigator.userAgentData;
+
+  if (uaData != null && uaData.brands) {
+    return uaData.brands.map(function (item) {
+      return item.brand + "/" + item.version;
+    }).join(' ');
+  }
+
+  return navigator.userAgent;
 }
 
 /***/ }),
@@ -5499,7 +5544,7 @@ var staticRenderFns = [function () {
   var _vm = this,
       _c = _vm._self._c;
 
-  return _c("div", [_c("h1", [_vm._v("About us")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")])]);
+  return _c("div", [_c("h1", [_vm._v("About us")]), _vm._v(" "), _c("p", [_vm._v("Ciao Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit, amet consectetur adipisicing elit. Autem amet sint, illo ipsam aut consequuntur minus eum? Neque, perferendis voluptates blanditiis ad tenetur maxime eaque et deserunt porro. Esse, vel.\n  Labore animi quo quas. Non similique, eligendi dicta ipsa, rem nulla nihil temporibus, repudiandae ipsam ut labore quo atque sit dolorum totam quaerat vel consectetur ea iusto consequuntur aliquam quod!\n  Voluptates id optio dignissimos in veniam libero, nesciunt nulla illum illo magni corporis molestias alias nobis, atque, repellendus officiis. Eum ipsum voluptate sint? Eveniet nobis, quidem quia sequi omnis quas.\n  Beatae fugiat quasi voluptas dolores aut incidunt quia ab tenetur pariatur eligendi, perspiciatis repudiandae nobis veritatis ratione, sequi, consequatur laudantium laboriosam illum quidem. Cumque maiores ex, dolor placeat architecto beatae?\n  Fugit iure nam eveniet culpa illum esse, eligendi voluptatibus omnis dolorum ipsam saepe voluptates dolorem ab aliquid in dicta doloribus repudiandae! Minus fugiat incidunt quidem maiores amet nihil adipisci tenetur!")])]);
 }];
 render._withStripped = true;
 
@@ -5619,7 +5664,68 @@ var staticRenderFns = [function () {
   var _vm = this,
       _c = _vm._self._c;
 
-  return _c("div", [_c("h1", [_vm._v("Contact us")]), _vm._v(" "), _c("p", [_vm._v("Lorem ipsum dolor sit amet consectetur, adipisicing elit. Voluptate, libero aperiam obcaecati cumque sequi aut maiores expedita ")]), _c("p", [_vm._v("Lorem ipsum dolor sit amet consectetur adipisicing elit. Blanditiis incidunt ullam accusantium inventore fuga. Minima accusamus exercitationem deserunt veniam sit nemo fuga dolorum animi aliquam, soluta, accusantium nulla, voluptas reprehenderit?\n  Maxime sed officia a fugit? Culpa voluptatum distinctio quas saepe, accusantium minus, hic rem consequatur illum optio autem omnis quod itaque at, natus pariatur aliquid alias obcaecati? Est, magnam fuga?\n  Excepturi eum quaerat totam praesentium alias, reiciendis voluptate fugit enim in minus aperiam velit amet ab nam dicta delectus quis unde ex quia eveniet consectetur recusandae illum. Odit, aliquid quisquam.\n  Aperiam voluptatibus officiis optio. Dolore eveniet qui tenetur sint. Nesciunt repellendus alias ab iure saepe nobis, a dolor at. Perferendis optio numquam est tenetur. Accusamus, sunt nisi? Ex, non iusto?\n  Facilis asperiores saepe labore, sunt tempora nemo temporibus nostrum tempore libero molestiae, non impedit aliquam eum recusandae ex? Dolor debitis enim molestiae officiis hic quod ipsa fuga corporis non in.")])]);
+  return _c("div", [_c("h1", [_vm._v("Contact us")]), _vm._v(" "), _c("form", [_c("div", {
+    staticClass: "mb-3"
+  }, [_c("label", {
+    staticClass: "form-label",
+    attrs: {
+      "for": "name"
+    }
+  }, [_vm._v("Name")]), _vm._v(" "), _c("input", {
+    staticClass: "form-control",
+    attrs: {
+      type: "text",
+      name: "name",
+      id: "name"
+    }
+  })]), _vm._v(" "), _c("div", {
+    staticClass: "mb-3"
+  }, [_c("label", {
+    staticClass: "form-label",
+    attrs: {
+      "for": "email"
+    }
+  }, [_vm._v("email")]), _vm._v(" "), _c("input", {
+    staticClass: "form-control",
+    attrs: {
+      type: "text",
+      name: "email",
+      id: "email"
+    }
+  })]), _vm._v(" "), _c("div", {
+    staticClass: "mb-3"
+  }, [_c("label", {
+    staticClass: "form-label",
+    attrs: {
+      "for": "message"
+    }
+  }, [_vm._v("message")]), _vm._v(" "), _c("textarea", {
+    staticClass: "form-control",
+    attrs: {
+      name: "message",
+      id: "message",
+      cols: "30",
+      rows: "10"
+    }
+  })]), _vm._v(" "), _c("div", [_c("input", {
+    staticClass: "form-check-input",
+    attrs: {
+      type: "checkbox",
+      name: "newsletter",
+      id: "newsletter",
+      checked: ""
+    }
+  }), _vm._v(" "), _c("label", {
+    staticClass: "form-check-label",
+    attrs: {
+      "for": "newsletter"
+    }
+  }, [_vm._v("Iscrivimi alla newsletter")])]), _vm._v(" "), _c("button", {
+    staticClass: "btn btn-primary",
+    attrs: {
+      type: "submit"
+    }
+  }, [_vm._v("Send")])])]);
 }];
 render._withStripped = true;
 
@@ -12216,13 +12322,20 @@ function normalizeComponent(
 /*!********************************************************!*\
   !*** ./node_modules/vue-router/dist/vue-router.esm.js ***!
   \********************************************************/
-/*! exports provided: default */
+/*! exports provided: NavigationFailureType, RouterLink, RouterView, START_LOCATION, default, isNavigationFailure, version */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "NavigationFailureType", function() { return NavigationFailureType; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RouterLink", function() { return Link; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RouterView", function() { return View; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "START_LOCATION", function() { return START; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return VueRouter$1; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "isNavigationFailure", function() { return isNavigationFailure; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "version", function() { return version; });
 /*!
-  * vue-router v3.5.4
+  * vue-router v3.6.3
   * (c) 2022 Evan You
   * @license MIT
   */
@@ -13313,7 +13426,7 @@ var Link = {
     }
   },
   render: function render (h) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var router = this.$router;
     var current = this.$route;
@@ -13356,7 +13469,7 @@ var Link = {
 
     var handler = function (e) {
       if (guardEvent(e)) {
-        if (this$1.replace) {
+        if (this$1$1.replace) {
           router.replace(location, noop);
         } else {
           router.push(location, noop);
@@ -14216,25 +14329,6 @@ function replaceState (url) {
   pushState(url, true);
 }
 
-/*  */
-
-function runQueue (queue, fn, cb) {
-  var step = function (index) {
-    if (index >= queue.length) {
-      cb();
-    } else {
-      if (queue[index]) {
-        fn(queue[index], function () {
-          step(index + 1);
-        });
-      } else {
-        step(index + 1);
-      }
-    }
-  };
-  step(0);
-}
-
 // When changing thing, also edit router.d.ts
 var NavigationFailureType = {
   redirected: 2,
@@ -14316,6 +14410,25 @@ function isNavigationFailure (err, errorType) {
     err._isRouter &&
     (errorType == null || err.type === errorType)
   )
+}
+
+/*  */
+
+function runQueue (queue, fn, cb) {
+  var step = function (index) {
+    if (index >= queue.length) {
+      cb();
+    } else {
+      if (queue[index]) {
+        fn(queue[index], function () {
+          step(index + 1);
+        });
+      } else {
+        step(index + 1);
+      }
+    }
+  };
+  step(0);
 }
 
 /*  */
@@ -14466,7 +14579,7 @@ History.prototype.transitionTo = function transitionTo (
   onComplete,
   onAbort
 ) {
-    var this$1 = this;
+    var this$1$1 = this;
 
   var route;
   // catch redirect option https://github.com/vuejs/vue-router/issues/3201
@@ -14483,17 +14596,17 @@ History.prototype.transitionTo = function transitionTo (
   this.confirmTransition(
     route,
     function () {
-      this$1.updateRoute(route);
+      this$1$1.updateRoute(route);
       onComplete && onComplete(route);
-      this$1.ensureURL();
-      this$1.router.afterHooks.forEach(function (hook) {
+      this$1$1.ensureURL();
+      this$1$1.router.afterHooks.forEach(function (hook) {
         hook && hook(route, prev);
       });
 
       // fire ready cbs once
-      if (!this$1.ready) {
-        this$1.ready = true;
-        this$1.readyCbs.forEach(function (cb) {
+      if (!this$1$1.ready) {
+        this$1$1.ready = true;
+        this$1$1.readyCbs.forEach(function (cb) {
           cb(route);
         });
       }
@@ -14502,14 +14615,14 @@ History.prototype.transitionTo = function transitionTo (
       if (onAbort) {
         onAbort(err);
       }
-      if (err && !this$1.ready) {
+      if (err && !this$1$1.ready) {
         // Initial redirection should not mark the history as ready yet
         // because it's triggered by the redirection instead
         // https://github.com/vuejs/vue-router/issues/3225
         // https://github.com/vuejs/vue-router/issues/3331
         if (!isNavigationFailure(err, NavigationFailureType.redirected) || prev !== START) {
-          this$1.ready = true;
-          this$1.readyErrorCbs.forEach(function (cb) {
+          this$1$1.ready = true;
+          this$1$1.readyErrorCbs.forEach(function (cb) {
             cb(err);
           });
         }
@@ -14519,7 +14632,7 @@ History.prototype.transitionTo = function transitionTo (
 };
 
 History.prototype.confirmTransition = function confirmTransition (route, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
   var current = this.current;
   this.pending = route;
@@ -14528,8 +14641,8 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
     // https://github.com/vuejs/vue-router/pull/3047 before that change,
     // redirect and aborted navigation would produce an err == null
     if (!isNavigationFailure(err) && isError(err)) {
-      if (this$1.errorCbs.length) {
-        this$1.errorCbs.forEach(function (cb) {
+      if (this$1$1.errorCbs.length) {
+        this$1$1.errorCbs.forEach(function (cb) {
           cb(err);
         });
       } else {
@@ -14578,17 +14691,17 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
   );
 
   var iterator = function (hook, next) {
-    if (this$1.pending !== route) {
+    if (this$1$1.pending !== route) {
       return abort(createNavigationCancelledError(current, route))
     }
     try {
       hook(route, current, function (to) {
         if (to === false) {
           // next(false) -> abort navigation, ensure current URL
-          this$1.ensureURL(true);
+          this$1$1.ensureURL(true);
           abort(createNavigationAbortedError(current, route));
         } else if (isError(to)) {
-          this$1.ensureURL(true);
+          this$1$1.ensureURL(true);
           abort(to);
         } else if (
           typeof to === 'string' ||
@@ -14598,9 +14711,9 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
           // next('/') or next({ path: '/' }) -> redirect
           abort(createNavigationRedirectedError(current, route));
           if (typeof to === 'object' && to.replace) {
-            this$1.replace(to);
+            this$1$1.replace(to);
           } else {
-            this$1.push(to);
+            this$1$1.push(to);
           }
         } else {
           // confirm transition and pass on the value
@@ -14616,15 +14729,15 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
     // wait until async components are resolved before
     // extracting in-component enter guards
     var enterGuards = extractEnterGuards(activated);
-    var queue = enterGuards.concat(this$1.router.resolveHooks);
+    var queue = enterGuards.concat(this$1$1.router.resolveHooks);
     runQueue(queue, iterator, function () {
-      if (this$1.pending !== route) {
+      if (this$1$1.pending !== route) {
         return abort(createNavigationCancelledError(current, route))
       }
-      this$1.pending = null;
+      this$1$1.pending = null;
       onComplete(route);
-      if (this$1.router.app) {
-        this$1.router.app.$nextTick(function () {
+      if (this$1$1.router.app) {
+        this$1$1.router.app.$nextTick(function () {
           handleRouteEntered(route);
         });
       }
@@ -14781,7 +14894,7 @@ var HTML5History = /*@__PURE__*/(function (History) {
   HTML5History.prototype.constructor = HTML5History;
 
   HTML5History.prototype.setupListeners = function setupListeners () {
-    var this$1 = this;
+    var this$1$1 = this;
 
     if (this.listeners.length > 0) {
       return
@@ -14796,16 +14909,16 @@ var HTML5History = /*@__PURE__*/(function (History) {
     }
 
     var handleRoutingEvent = function () {
-      var current = this$1.current;
+      var current = this$1$1.current;
 
       // Avoiding first `popstate` event dispatched in some browsers but first
       // history route not updated since async guard at the same time.
-      var location = getLocation(this$1.base);
-      if (this$1.current === START && location === this$1._startLocation) {
+      var location = getLocation(this$1$1.base);
+      if (this$1$1.current === START && location === this$1$1._startLocation) {
         return
       }
 
-      this$1.transitionTo(location, function (route) {
+      this$1$1.transitionTo(location, function (route) {
         if (supportsScroll) {
           handleScroll(router, route, current, true);
         }
@@ -14822,25 +14935,25 @@ var HTML5History = /*@__PURE__*/(function (History) {
   };
 
   HTML5History.prototype.push = function push (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var ref = this;
     var fromRoute = ref.current;
     this.transitionTo(location, function (route) {
-      pushState(cleanPath(this$1.base + route.fullPath));
-      handleScroll(this$1.router, route, fromRoute, false);
+      pushState(cleanPath(this$1$1.base + route.fullPath));
+      handleScroll(this$1$1.router, route, fromRoute, false);
       onComplete && onComplete(route);
     }, onAbort);
   };
 
   HTML5History.prototype.replace = function replace (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var ref = this;
     var fromRoute = ref.current;
     this.transitionTo(location, function (route) {
-      replaceState(cleanPath(this$1.base + route.fullPath));
-      handleScroll(this$1.router, route, fromRoute, false);
+      replaceState(cleanPath(this$1$1.base + route.fullPath));
+      handleScroll(this$1$1.router, route, fromRoute, false);
       onComplete && onComplete(route);
     }, onAbort);
   };
@@ -14892,7 +15005,7 @@ var HashHistory = /*@__PURE__*/(function (History) {
   // this is delayed until the app mounts
   // to avoid the hashchange listener being fired too early
   HashHistory.prototype.setupListeners = function setupListeners () {
-    var this$1 = this;
+    var this$1$1 = this;
 
     if (this.listeners.length > 0) {
       return
@@ -14907,13 +15020,13 @@ var HashHistory = /*@__PURE__*/(function (History) {
     }
 
     var handleRoutingEvent = function () {
-      var current = this$1.current;
+      var current = this$1$1.current;
       if (!ensureSlash()) {
         return
       }
-      this$1.transitionTo(getHash(), function (route) {
+      this$1$1.transitionTo(getHash(), function (route) {
         if (supportsScroll) {
-          handleScroll(this$1.router, route, current, true);
+          handleScroll(this$1$1.router, route, current, true);
         }
         if (!supportsPushState) {
           replaceHash(route.fullPath);
@@ -14931,7 +15044,7 @@ var HashHistory = /*@__PURE__*/(function (History) {
   };
 
   HashHistory.prototype.push = function push (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var ref = this;
     var fromRoute = ref.current;
@@ -14939,7 +15052,7 @@ var HashHistory = /*@__PURE__*/(function (History) {
       location,
       function (route) {
         pushHash(route.fullPath);
-        handleScroll(this$1.router, route, fromRoute, false);
+        handleScroll(this$1$1.router, route, fromRoute, false);
         onComplete && onComplete(route);
       },
       onAbort
@@ -14947,7 +15060,7 @@ var HashHistory = /*@__PURE__*/(function (History) {
   };
 
   HashHistory.prototype.replace = function replace (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var ref = this;
     var fromRoute = ref.current;
@@ -14955,7 +15068,7 @@ var HashHistory = /*@__PURE__*/(function (History) {
       location,
       function (route) {
         replaceHash(route.fullPath);
-        handleScroll(this$1.router, route, fromRoute, false);
+        handleScroll(this$1$1.router, route, fromRoute, false);
         onComplete && onComplete(route);
       },
       onAbort
@@ -15047,13 +15160,13 @@ var AbstractHistory = /*@__PURE__*/(function (History) {
   AbstractHistory.prototype.constructor = AbstractHistory;
 
   AbstractHistory.prototype.push = function push (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     this.transitionTo(
       location,
       function (route) {
-        this$1.stack = this$1.stack.slice(0, this$1.index + 1).concat(route);
-        this$1.index++;
+        this$1$1.stack = this$1$1.stack.slice(0, this$1$1.index + 1).concat(route);
+        this$1$1.index++;
         onComplete && onComplete(route);
       },
       onAbort
@@ -15061,12 +15174,12 @@ var AbstractHistory = /*@__PURE__*/(function (History) {
   };
 
   AbstractHistory.prototype.replace = function replace (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     this.transitionTo(
       location,
       function (route) {
-        this$1.stack = this$1.stack.slice(0, this$1.index).concat(route);
+        this$1$1.stack = this$1$1.stack.slice(0, this$1$1.index).concat(route);
         onComplete && onComplete(route);
       },
       onAbort
@@ -15074,7 +15187,7 @@ var AbstractHistory = /*@__PURE__*/(function (History) {
   };
 
   AbstractHistory.prototype.go = function go (n) {
-    var this$1 = this;
+    var this$1$1 = this;
 
     var targetIndex = this.index + n;
     if (targetIndex < 0 || targetIndex >= this.stack.length) {
@@ -15084,16 +15197,16 @@ var AbstractHistory = /*@__PURE__*/(function (History) {
     this.confirmTransition(
       route,
       function () {
-        var prev = this$1.current;
-        this$1.index = targetIndex;
-        this$1.updateRoute(route);
-        this$1.router.afterHooks.forEach(function (hook) {
+        var prev = this$1$1.current;
+        this$1$1.index = targetIndex;
+        this$1$1.updateRoute(route);
+        this$1$1.router.afterHooks.forEach(function (hook) {
           hook && hook(route, prev);
         });
       },
       function (err) {
         if (isNavigationFailure(err, NavigationFailureType.duplicated)) {
-          this$1.index = targetIndex;
+          this$1$1.index = targetIndex;
         }
       }
     );
@@ -15112,6 +15225,8 @@ var AbstractHistory = /*@__PURE__*/(function (History) {
 }(History));
 
 /*  */
+
+
 
 var VueRouter = function VueRouter (options) {
   if ( options === void 0 ) options = {};
@@ -15166,7 +15281,7 @@ prototypeAccessors.currentRoute.get = function () {
 };
 
 VueRouter.prototype.init = function init (app /* Vue component instance */) {
-    var this$1 = this;
+    var this$1$1 = this;
 
    true &&
     assert(
@@ -15181,13 +15296,13 @@ VueRouter.prototype.init = function init (app /* Vue component instance */) {
   // https://github.com/vuejs/vue-router/issues/2639
   app.$once('hook:destroyed', function () {
     // clean out app from this.apps array once destroyed
-    var index = this$1.apps.indexOf(app);
-    if (index > -1) { this$1.apps.splice(index, 1); }
+    var index = this$1$1.apps.indexOf(app);
+    if (index > -1) { this$1$1.apps.splice(index, 1); }
     // ensure we still have a main app or null if no apps
     // we do not release the router so it can be reused
-    if (this$1.app === app) { this$1.app = this$1.apps[0] || null; }
+    if (this$1$1.app === app) { this$1$1.app = this$1$1.apps[0] || null; }
 
-    if (!this$1.app) { this$1.history.teardown(); }
+    if (!this$1$1.app) { this$1$1.history.teardown(); }
   });
 
   // main app previously initialized
@@ -15203,11 +15318,11 @@ VueRouter.prototype.init = function init (app /* Vue component instance */) {
   if (history instanceof HTML5History || history instanceof HashHistory) {
     var handleInitialScroll = function (routeOrError) {
       var from = history.current;
-      var expectScroll = this$1.options.scrollBehavior;
+      var expectScroll = this$1$1.options.scrollBehavior;
       var supportsScroll = supportsPushState && expectScroll;
 
       if (supportsScroll && 'fullPath' in routeOrError) {
-        handleScroll(this$1, routeOrError, from, false);
+        handleScroll(this$1$1, routeOrError, from, false);
       }
     };
     var setupListeners = function (routeOrError) {
@@ -15222,7 +15337,7 @@ VueRouter.prototype.init = function init (app /* Vue component instance */) {
   }
 
   history.listen(function (route) {
-    this$1.apps.forEach(function (app) {
+    this$1$1.apps.forEach(function (app) {
       app._route = route;
     });
   });
@@ -15249,12 +15364,12 @@ VueRouter.prototype.onError = function onError (errorCb) {
 };
 
 VueRouter.prototype.push = function push (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
   // $flow-disable-line
   if (!onComplete && !onAbort && typeof Promise !== 'undefined') {
     return new Promise(function (resolve, reject) {
-      this$1.history.push(location, resolve, reject);
+      this$1$1.history.push(location, resolve, reject);
     })
   } else {
     this.history.push(location, onComplete, onAbort);
@@ -15262,12 +15377,12 @@ VueRouter.prototype.push = function push (location, onComplete, onAbort) {
 };
 
 VueRouter.prototype.replace = function replace (location, onComplete, onAbort) {
-    var this$1 = this;
+    var this$1$1 = this;
 
   // $flow-disable-line
   if (!onComplete && !onAbort && typeof Promise !== 'undefined') {
     return new Promise(function (resolve, reject) {
-      this$1.history.replace(location, resolve, reject);
+      this$1$1.history.replace(location, resolve, reject);
     })
   } else {
     this.history.replace(location, onComplete, onAbort);
@@ -15349,6 +15464,8 @@ VueRouter.prototype.addRoutes = function addRoutes (routes) {
 
 Object.defineProperties( VueRouter.prototype, prototypeAccessors );
 
+var VueRouter$1 = VueRouter;
+
 function registerHook (list, fn) {
   list.push(fn);
   return function () {
@@ -15362,8 +15479,9 @@ function createHref (base, fullPath, mode) {
   return base ? cleanPath(base + '/' + path) : path
 }
 
+// We cannot remove this as it would be a breaking change
 VueRouter.install = install;
-VueRouter.version = '3.5.4';
+VueRouter.version = '3.6.3';
 VueRouter.isNavigationFailure = isNavigationFailure;
 VueRouter.NavigationFailureType = NavigationFailureType;
 VueRouter.START_LOCATION = START;
@@ -15372,7 +15490,9 @@ if (inBrowser && window.Vue) {
   window.Vue.use(VueRouter);
 }
 
-/* harmony default export */ __webpack_exports__["default"] = (VueRouter);
+var version = '3.6.3';
+
+
 
 
 /***/ }),
@@ -15386,7 +15506,7 @@ if (inBrowser && window.Vue) {
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(global, setImmediate) {/*!
- * Vue.js v2.7.7
+ * Vue.js v2.7.10
  * (c) 2014-2022 Evan You
  * Released under the MIT License.
  */
@@ -16030,13 +16150,13 @@ let initProxy;
             'referenced during render. Make sure that this property is reactive, ' +
             'either in the data option, or for class-based components, by ' +
             'initializing the property. ' +
-            'See: https://vuejs.org/v2/guide/reactivity.html#Declaring-Reactive-Properties.', target);
+            'See: https://v2.vuejs.org/v2/guide/reactivity.html#Declaring-Reactive-Properties.', target);
     };
     const warnReservedPrefix = (target, key) => {
         warn$2(`Property "${key}" must be accessed with "$data.${key}" because ` +
             'properties starting with "$" or "_" are not proxied in the Vue instance to ' +
             'prevent conflicts with Vue internals. ' +
-            'See: https://vuejs.org/v2/api/#data', target);
+            'See: https://v2.vuejs.org/v2/api/#data', target);
     };
     const hasProxy = typeof Proxy !== 'undefined' && isNative(Proxy);
     if (hasProxy) {
@@ -16348,7 +16468,7 @@ function defineReactive(obj, key, val, customSetter, shallow, mock) {
                 // #7981: for accessor properties without setter
                 return;
             }
-            else if (isRef(value) && !isRef(newVal)) {
+            else if (!shallow && isRef(value) && !isRef(newVal)) {
                 value.value = newVal;
                 return;
             }
@@ -17621,7 +17741,19 @@ function createSetupContext(vm) {
     let exposeCalled = false;
     return {
         get attrs() {
-            return initAttrsProxy(vm);
+            if (!vm._attrsProxy) {
+                const proxy = (vm._attrsProxy = {});
+                def(proxy, '_v_attr_proxy', true);
+                syncSetupProxy(proxy, vm.$attrs, emptyObject, vm, '$attrs');
+            }
+            return vm._attrsProxy;
+        },
+        get listeners() {
+            if (!vm._listenersProxy) {
+                const proxy = (vm._listenersProxy = {});
+                syncSetupProxy(proxy, vm.$listeners, emptyObject, vm, '$listeners');
+            }
+            return vm._listenersProxy;
         },
         get slots() {
             return initSlotsProxy(vm);
@@ -17640,20 +17772,12 @@ function createSetupContext(vm) {
         }
     };
 }
-function initAttrsProxy(vm) {
-    if (!vm._attrsProxy) {
-        const proxy = (vm._attrsProxy = {});
-        def(proxy, '_v_attr_proxy', true);
-        syncSetupAttrs(proxy, vm.$attrs, emptyObject, vm);
-    }
-    return vm._attrsProxy;
-}
-function syncSetupAttrs(to, from, prev, instance) {
+function syncSetupProxy(to, from, prev, instance, type) {
     let changed = false;
     for (const key in from) {
         if (!(key in to)) {
             changed = true;
-            defineProxyAttr(to, key, instance);
+            defineProxyAttr(to, key, instance, type);
         }
         else if (from[key] !== prev[key]) {
             changed = true;
@@ -17667,12 +17791,12 @@ function syncSetupAttrs(to, from, prev, instance) {
     }
     return changed;
 }
-function defineProxyAttr(proxy, key, instance) {
+function defineProxyAttr(proxy, key, instance, type) {
     Object.defineProperty(proxy, key, {
         enumerable: true,
         configurable: true,
         get() {
-            return instance.$attrs[key];
+            return instance[type][key];
         }
     });
 }
@@ -17693,16 +17817,26 @@ function syncSetupSlots(to, from) {
     }
 }
 /**
- * @internal use manual type def
+ * @internal use manual type def because public setup context type relies on
+ * legacy VNode types
  */
 function useSlots() {
     return getContext().slots;
 }
 /**
- * @internal use manual type def
+ * @internal use manual type def because public setup context type relies on
+ * legacy VNode types
  */
 function useAttrs() {
     return getContext().attrs;
+}
+/**
+ * Vue 2 only
+ * @internal use manual type def because public setup context type relies on
+ * legacy VNode types
+ */
+function useListeners() {
+    return getContext().listeners;
 }
 function getContext() {
     if (!currentInstance) {
@@ -18144,8 +18278,13 @@ function lifecycleMixin(Vue) {
             vm.$el.__vue__ = vm;
         }
         // if parent is an HOC, update its $el as well
-        if (vm.$vnode && vm.$parent && vm.$vnode === vm.$parent._vnode) {
-            vm.$parent.$el = vm.$el;
+        let wrapper = vm;
+        while (wrapper &&
+            wrapper.$vnode &&
+            wrapper.$parent &&
+            wrapper.$vnode === wrapper.$parent._vnode) {
+            wrapper.$parent.$el = wrapper.$el;
+            wrapper = wrapper.$parent;
         }
         // updated hook is called by the scheduler to ensure that children are
         // updated in a parent's updated hook.
@@ -18304,12 +18443,19 @@ function updateChildComponent(vm, propsData, listeners, parentVnode, renderChild
     if (vm._attrsProxy) {
         // force update if attrs are accessed and has changed since it may be
         // passed to a child component.
-        if (syncSetupAttrs(vm._attrsProxy, attrs, (prevVNode.data && prevVNode.data.attrs) || emptyObject, vm)) {
+        if (syncSetupProxy(vm._attrsProxy, attrs, (prevVNode.data && prevVNode.data.attrs) || emptyObject, vm, '$attrs')) {
             needsForceUpdate = true;
         }
     }
     vm.$attrs = attrs;
-    vm.$listeners = listeners || emptyObject;
+    // update listeners
+    listeners = listeners || emptyObject;
+    const prevListeners = vm.$options._parentListeners;
+    if (vm._listenersProxy) {
+        syncSetupProxy(vm._listenersProxy, listeners, prevListeners || emptyObject, vm, '$listeners');
+    }
+    vm.$listeners = vm.$options._parentListeners = listeners;
+    updateComponentListeners(vm, listeners, prevListeners);
     // update props
     if (propsData && vm.$options.props) {
         toggleObserving(false);
@@ -18324,11 +18470,6 @@ function updateChildComponent(vm, propsData, listeners, parentVnode, renderChild
         // keep a copy of raw propsData
         vm.$options.propsData = propsData;
     }
-    // update listeners
-    listeners = listeners || emptyObject;
-    const oldListeners = vm.$options._parentListeners;
-    vm.$options._parentListeners = listeners;
-    updateComponentListeners(vm, listeners, oldListeners);
     // resolve slots + force update if has children
     if (needsForceUpdate) {
         vm.$slots = resolveSlots(renderChildren, parentVnode.context);
@@ -18696,8 +18837,7 @@ function doWatch(source, cb, { immediate, deep, flush = 'pre', onTrack, onTrigge
     let oldValue = isMultiSource ? [] : INITIAL_WATCHER_VALUE;
     // overwrite default run
     watcher.run = () => {
-        if (!watcher.active &&
-            !(flush === 'pre' && instance && instance._isBeingDestroyed)) {
+        if (!watcher.active) {
             return;
         }
         if (cb) {
@@ -19258,17 +19398,20 @@ const onBeforeUpdate = createLifeCycle('beforeUpdate');
 const onUpdated = createLifeCycle('updated');
 const onBeforeUnmount = createLifeCycle('beforeDestroy');
 const onUnmounted = createLifeCycle('destroyed');
-const onErrorCaptured = createLifeCycle('errorCaptured');
 const onActivated = createLifeCycle('activated');
 const onDeactivated = createLifeCycle('deactivated');
 const onServerPrefetch = createLifeCycle('serverPrefetch');
 const onRenderTracked = createLifeCycle('renderTracked');
 const onRenderTriggered = createLifeCycle('renderTriggered');
+const injectErrorCapturedHook = createLifeCycle('errorCaptured');
+function onErrorCaptured(hook, target = currentInstance) {
+    injectErrorCapturedHook(hook, target);
+}
 
 /**
  * Note: also update dist/vue.runtime.mjs when adding new exports to this file.
  */
-const version = '2.7.7';
+const version = '2.7.10';
 /**
  * @internal type is manually declared in <root>/types/v3-define-component.d.ts
  */
@@ -19314,6 +19457,7 @@ var vca = /*#__PURE__*/Object.freeze({
   getCurrentInstance: getCurrentInstance,
   useSlots: useSlots,
   useAttrs: useAttrs,
+  useListeners: useListeners,
   mergeDefaults: mergeDefaults,
   nextTick: nextTick,
   set: set,
@@ -19327,12 +19471,12 @@ var vca = /*#__PURE__*/Object.freeze({
   onUpdated: onUpdated,
   onBeforeUnmount: onBeforeUnmount,
   onUnmounted: onUnmounted,
-  onErrorCaptured: onErrorCaptured,
   onActivated: onActivated,
   onDeactivated: onDeactivated,
   onServerPrefetch: onServerPrefetch,
   onRenderTracked: onRenderTracked,
-  onRenderTriggered: onRenderTriggered
+  onRenderTriggered: onRenderTriggered,
+  onErrorCaptured: onErrorCaptured
 });
 
 const seenObjects = new _Set();
@@ -19386,11 +19530,16 @@ let uid$1 = 0;
  */
 class Watcher {
     constructor(vm, expOrFn, cb, options, isRenderWatcher) {
-        recordEffectScope(this, activeEffectScope || (vm ? vm._scope : undefined));
-        if ((this.vm = vm)) {
-            if (isRenderWatcher) {
-                vm._watcher = this;
-            }
+        recordEffectScope(this, 
+        // if the active effect scope is manually created (not a component scope),
+        // prioritize it
+        activeEffectScope && !activeEffectScope._vm
+            ? activeEffectScope
+            : vm
+                ? vm._scope
+                : undefined);
+        if ((this.vm = vm) && isRenderWatcher) {
+            vm._watcher = this;
         }
         // options
         if (options) {
@@ -19654,7 +19803,7 @@ function initData(vm) {
     if (!isPlainObject(data)) {
         data = {};
         warn$2('data functions should return an object:\n' +
-                'https://vuejs.org/v2/guide/components.html#data-Must-Be-a-Function', vm);
+                'https://v2.vuejs.org/v2/guide/components.html#data-Must-Be-a-Function', vm);
     }
     // proxy data on instance
     const keys = Object.keys(data);
@@ -19950,6 +20099,7 @@ function initMixin$1(Vue) {
         vm.__v_skip = true;
         // effect scope
         vm._scope = new EffectScope(true /* detached */);
+        vm._scope._vm = true;
         // merge options
         if (options && options._isComponent) {
             // optimize internal component instantiation
@@ -22485,7 +22635,16 @@ function normalizeDirectives(dirs, vm) {
         }
         res[getRawDirName(dir)] = dir;
         if (vm._setupState && vm._setupState.__sfc) {
-            dir.def = dir.def || resolveAsset(vm, '_setupState', 'v-' + dir.name);
+            const setupDef = dir.def || resolveAsset(vm, '_setupState', 'v-' + dir.name);
+            if (typeof setupDef === 'function') {
+                dir.def = {
+                    bind: setupDef,
+                    update: setupDef,
+                };
+            }
+            else {
+                dir.def = setupDef;
+            }
         }
         dir.def = dir.def || resolveAsset(vm.$options, 'directives', dir.name, true);
     }
@@ -26223,10 +26382,7 @@ function genElement(el, state) {
             // check if this is a component in <script setup>
             const bindings = state.options.bindings;
             if (maybeComponent && bindings && bindings.__isScriptSetup !== false) {
-                tag =
-                    checkBindingType(bindings, el.tag) ||
-                        checkBindingType(bindings, camelize(el.tag)) ||
-                        checkBindingType(bindings, capitalize(camelize(el.tag)));
+                tag = checkBindingType(bindings, el.tag);
             }
             if (!tag)
                 tag = `'${el.tag}'`;
@@ -26243,9 +26399,29 @@ function genElement(el, state) {
     }
 }
 function checkBindingType(bindings, key) {
-    const type = bindings[key];
-    if (type && type.startsWith('setup')) {
-        return key;
+    const camelName = camelize(key);
+    const PascalName = capitalize(camelName);
+    const checkType = (type) => {
+        if (bindings[key] === type) {
+            return key;
+        }
+        if (bindings[camelName] === type) {
+            return camelName;
+        }
+        if (bindings[PascalName] === type) {
+            return PascalName;
+        }
+    };
+    const fromConst = checkType("setup-const" /* BindingTypes.SETUP_CONST */) ||
+        checkType("setup-reactive-const" /* BindingTypes.SETUP_REACTIVE_CONST */);
+    if (fromConst) {
+        return fromConst;
+    }
+    const fromMaybeRef = checkType("setup-let" /* BindingTypes.SETUP_LET */) ||
+        checkType("setup-ref" /* BindingTypes.SETUP_REF */) ||
+        checkType("setup-maybe-ref" /* BindingTypes.SETUP_MAYBE_REF */);
+    if (fromMaybeRef) {
+        return fromMaybeRef;
     }
 }
 // hoist static sub-trees out
@@ -27915,8 +28091,8 @@ __webpack_require__.r(__webpack_exports__);
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! C:\Users\huser\Desktop\boolean\classe64\laravel\classe64-30-boolpress\resources\js\front.js */"./resources/js/front.js");
-module.exports = __webpack_require__(/*! C:\Users\huser\Desktop\boolean\classe64\laravel\classe64-30-boolpress\resources\sass\back.scss */"./resources/sass/back.scss");
+__webpack_require__(/*! C:\Users\mouhc\Desktop\BOOLEAN\_php\laravel-boolpress\resources\js\front.js */"./resources/js/front.js");
+module.exports = __webpack_require__(/*! C:\Users\mouhc\Desktop\BOOLEAN\_php\laravel-boolpress\resources\sass\back.scss */"./resources/sass/back.scss");
 
 
 /***/ })
